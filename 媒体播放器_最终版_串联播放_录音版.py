@@ -176,7 +176,9 @@ class DriveUploadWorker(QThread):
 
         try:
             creds = None
-            token_path = resource_path('token.json')
+            # token.json 必须放在可写的持久目录（与配置文件同级），不能用 resource_path
+            # 否则打包后写入临时目录，下次启动就丢失，导致反复授权
+            token_path = str(Path.cwd() / "token.json")
             cred_path = resource_path('credentials.json')
 
             if os.path.exists(token_path):
@@ -191,20 +193,21 @@ class DriveUploadWorker(QThread):
                         return
                     flow = InstalledAppFlow.from_client_secrets_file(cred_path, self.scopes)
                     creds = flow.run_local_server(port=0)
-                
-                with open(token_path, 'w') as token:
+
+                # 无论是首次授权还是 refresh，都写回 token.json，保证下次直接复用
+                with open(token_path, 'w', encoding='utf-8') as token:
                     token.write(creds.to_json())
 
             service = build('drive', 'v3', credentials=creds)
             file_name = os.path.basename(self.filepath)
-            
+
             file_metadata = {'name': file_name}
             if self.folder_id and self.folder_id.strip():
                 file_metadata['parents'] = [self.folder_id.strip()]
 
             media = MediaFileUpload(self.filepath, mimetype='audio/mp4', resumable=True)
             file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-            
+
             self.finished_signal.emit(f"录音文件 [{file_name}] 已成功上传至 Google Drive！\n文件 ID: {file.get('id')}", True)
         except Exception as e:
             self.finished_signal.emit(f"上传 Google Drive 失败:\n{str(e)}", False)
@@ -1969,19 +1972,28 @@ class ControlWindow(QMainWindow):
         with open(p, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=2)
 
     def update_audio_session_name(self):
-        name = self.custom_title or self.default_title or "媒体控制台"
-        QApplication.setApplicationName(name)
-        QApplication.setApplicationDisplayName(name)
-        
-        try: ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(name)
-        except: pass
-        
+        # 应用名固定为「媒体控制台」，避免与窗口标题叠加后出现
+        # 「通道一播放器 - 媒体控制台 - 通道一播放器」这种重复
+        # 混音器里的会话名仍可用自定义题头区分多开
+        app_name = "媒体控制台"
+        session_name = self.custom_title or app_name
+
+        QApplication.setApplicationName(app_name)
+        QApplication.setApplicationDisplayName(app_name)
+
         try:
-            if hasattr(self.vlc_instance, 'set_app_id'): self.vlc_instance.set_app_id(name, "", "")
-        except: pass
-        
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_name)
+        except Exception:
+            pass
+
+        try:
+            if hasattr(self.vlc_instance, 'set_app_id'):
+                self.vlc_instance.set_app_id(app_name, "", "")
+        except Exception:
+            pass
+
         for t in [100, 500, 1000, 2000, 4000, 6000, 8000, 10000]:
-            QTimer.singleShot(t, lambda: set_windows_audio_session_name(name))
+            QTimer.singleShot(t, lambda n=session_name: set_windows_audio_session_name(n))
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -2597,6 +2609,7 @@ class ControlWindow(QMainWindow):
             self.setWindowTitle(f"{self.custom_title} - {self.default_title}")
         else:
             self.center_title_label.setText("")
+            self.setWindowTitle(self.default_title)
 
         volume = int(st.value("settings/volume", 100))
         muted = str(st.value("settings/muted", "false")).lower() in ("1", "true", "yes")
@@ -3159,7 +3172,7 @@ class ControlWindow(QMainWindow):
                 self.playlist_click_mode = dialog.click_mode_combo.currentData()
                 self.default_video_open = dialog.video_open_combo.currentData()
                 self.network_auto_play = dialog.net_play_combo.currentData()
-                self.custom_title = dialog.title_box.text()
+                self.custom_title = dialog.title_box.text().strip()
 
                 if self.custom_title:
                     self.center_title_label.setText(self.custom_title)
@@ -3169,7 +3182,7 @@ class ControlWindow(QMainWindow):
                     self.setWindowTitle(self.default_title)
 
                 self.record_save_dir = dialog.record_dir_box.text()
-                
+
                 self.auto_upload_drive = dialog.drive_upload_combo.currentData()
                 self.drive_folder_id = dialog.drive_folder_box.text().strip()
 

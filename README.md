@@ -2,11 +2,21 @@
 
 基于 Python、PySide6 和 libVLC 的 Windows 桌面媒体播放器，支持播放列表、区段串联播放、录音和可选的 Google Drive 上传。
 
+个人公开仓库：https://github.com/jmdx-code/media-console
+
+## v1.0.1 更新
+
+- 授权令牌保存到持久工作目录，刷新后写回，避免打包临时目录造成重复授权。
+- 固定应用名称，修复窗口标题重复和空标题恢复，保留自定义音频会话名称。
+- 更新软件图标。
+
+本版本在个人账号独立发布；仓库中原有安全审核报告为历史记录。
+
 ## 使用方法
 
 1. 安装 [VideoLAN 官方 64 位 VLC](https://www.videolan.org/vlc/)。播放器依赖其 libVLC，本项目发布包不包含 VLC。
 2. 从本仓库 Releases 下载 `MediaConsole.exe`，放入可写目录后运行。
-3. Google Drive 上传为可选功能：使用自己的桌面 OAuth 客户端配置 `credentials.json`，授权后生成 `token.json`。这些文件只保存在本机，不要分享或提交。
+3. Google Drive 上传为可选功能：使用自己的桌面 OAuth 客户端配置 `credentials.json`，授权后在当前工作目录（与 `MediaConsoleConfig.ini` 同级）保存 `token.json`，刷新授权后也会写回。请从固定的可写工作目录启动软件，以复用授权。这些文件只保存在本机，不要分享或提交。
 4. 录音、播放列表及 `MediaConsoleConfig.ini` 属于个人数据，不随软件发布。
 
 当前发布目标为 Windows x64。来源证明用于验证构建来源，不等同于 Windows Authenticode 签名或平台审核通过。
@@ -62,7 +72,7 @@ git push origin v1.0.1
 安装 GitHub CLI 后，对下载的文件执行：
 
 ```powershell
-gh attestation verify .\MediaConsole.exe --repo secure-artifacts/media-console
+gh attestation verify .\MediaConsole.exe --repo jmdx-code/media-console
 ```
 
 ### 构建失败处理

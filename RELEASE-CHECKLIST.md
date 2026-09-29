@@ -1,5 +1,7 @@
 # 安全发布进度
 
+> 以下为组织仓库 v1.0.0 的历史流程。新版改在个人公开仓库 https://github.com/jmdx-code/media-console 发布。
+
 - [x] Step 0：GitHub CLI 现有认证可用；使用现有浏览器工具替代新安装 MCP。
 - [x] Step 1：jmdx-code 为 secure-artifacts 有效成员。
 - [x] Step 2：生成 Windows PyInstaller CI、CodeQL 和 Dependabot；源码语法及依赖解析通过。
